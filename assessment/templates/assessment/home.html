@@ -1,26 +1,2 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Trauma Assessment</title>
-</head>
-
-<body>
-
-    <h1>Trauma Assessment</h1>
-
-    <p>
-        Answer a few questions to understand your
-        current wellbeing and identify appropriate support.
-    </p>
-
-    <button>
-        Start Assessment
-    </button>
-
-</body>
-
-</html>
+{% load static %}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Harbor — wellbeing check-in</title><link rel="stylesheet" href="{% static 'assessment/styles.css' %}"></head><body><main class="shell hero"><p class="eyebrow">HARBOR</p><h1>A calm place to check in with yourself.</h1><p class="lead">A private, guided reflection on how you’re coping physically and mentally. It takes about two minutes.</p><a class="button" href="{% url 'focus' %}">Begin check-in →</a><p class="fine-print">This is not a diagnosis or emergency service. If you are in immediate danger, call your local emergency number.</p></main></body></html>

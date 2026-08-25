@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Guidance | Trauma Assessment</title>
+</head>
+<body>
+    <main>
+        <h1>Your check-in guidance</h1>
+        <p>Based on your answers, <strong>{{ level }}</strong>.</p>
+        <p>{{ message }}</p>
+
+        {% if show_urgent_guidance %}
+            <section aria-labelledby="urgent-heading">
+                <h2 id="urgent-heading">If you may be in immediate danger</h2>
+                <p>Call your local emergency number now, go to the nearest emergency department, or ask a trusted person to stay with you. If calling is not safe, use a local crisis text/chat service or leave the situation if you can do so safely.</p>
+            </section>
+        {% endif %}
+
+        <p>This check-in is not a diagnosis. A licensed professional can help you decide what care is right for you.</p>
+        <p><a href="{% url 'check_in' %}">Take the check-in again</a> · <a href="{% url 'home' %}">Return home</a></p>
+    </main>
+</body>
+</html>

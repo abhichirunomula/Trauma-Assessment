@@ -1,0 +1,1 @@
+document.querySelectorAll('input[name="symptoms"]').forEach((input)=>input.addEventListener('change',()=>{const none=document.querySelector('input[value="none"]');if(input.value==='none'&&input.checked)document.querySelectorAll('input[name="symptoms"]').forEach((item)=>{if(item!==input)item.checked=false});else if(input.checked&&none)none.checked=false;}));

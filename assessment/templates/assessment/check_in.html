@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wellbeing Check-in | Trauma Assessment</title>
+</head>
+<body>
+    <main>
+        <h1>Wellbeing check-in</h1>
+        <p>You can stop at any time. Your answers are used only to show this page's guidance and are not saved.</p>
+
+        {% if error %}
+            <p role="alert">{{ error }}</p>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            {% for item in questions %}
+                <fieldset>
+                    <legend>{{ forloop.counter }}. {{ item.question }}</legend>
+                    {% for value, label in item.options %}
+                        <label>
+                            <input type="radio" name="{{ item.name }}" value="{{ value }}" required>
+                            {{ label }}
+                        </label><br>
+                    {% endfor %}
+                </fieldset>
+            {% endfor %}
+            <button type="submit">See supportive guidance</button>
+        </form>
+
+        <p><a href="{% url 'home' %}">Return home</a></p>
+    </main>
+</body>
+</html>
