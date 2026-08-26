@@ -1,12 +1,17 @@
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from .models import Assessment, ConversationTurn
 
 
 class AssessmentEngineTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="river", password="safe-password-123")
+        self.client.force_login(self.user)
+
     def answer(self, route, key, value):
         return self.client.post(reverse(route), {key: value}, follow=True)
 
@@ -17,6 +22,7 @@ class AssessmentEngineTests(TestCase):
         if safety == "unsafe":
             self.client.get(reverse("safety_support"))
         self.answer("symptoms", "symptoms", ["sleep", "energy"])
+        self.answer("adaptive_question", "value", "routine")
         self.answer("impact", "value", "moderately")
         self.answer("support", "value", "yes")
         return self.client.post(reverse("summary"), follow=True)
@@ -24,6 +30,7 @@ class AssessmentEngineTests(TestCase):
     def test_every_answer_is_persisted_before_completion(self):
         self.answer("focus", "value", "physical")
         assessment = Assessment.objects.get()
+        self.assertEqual(assessment.user, self.user)
         self.assertEqual(assessment.focus, "physical")
         self.assertEqual(assessment.status, Assessment.Status.IN_PROGRESS)
         self.answer("experience", "value", "recent_event")
@@ -36,6 +43,7 @@ class AssessmentEngineTests(TestCase):
         self.assertEqual(assessment.status, Assessment.Status.COMPLETED)
         self.assertIsNotNone(assessment.completed_at)
         self.assertEqual(assessment.symptoms, ["sleep", "energy"])
+        self.assertEqual(assessment.answers.count(), 7)
 
     def test_unsafe_response_uses_dedicated_safety_layer(self):
         self.answer("focus", "value", "mental")

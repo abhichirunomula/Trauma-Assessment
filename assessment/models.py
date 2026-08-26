@@ -1,8 +1,11 @@
 from django.core.validators import MaxLengthValidator
+from django.conf import settings
 from django.db import models
 
 
 class Assessment(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assessments")
+
     class Status(models.TextChoices):
         IN_PROGRESS = "in_progress", "In progress"
         COMPLETED = "completed", "Completed"
@@ -25,6 +28,29 @@ class Assessment(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class AssessmentAnswer(models.Model):
+    """An auditable answer record; values are always selected by server-side forms."""
+    assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE, related_name="answers")
+    question_key = models.SlugField(max_length=64)
+    question_text = models.CharField(max_length=500)
+    answer = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("assessment", "question_key"), name="one_answer_per_question")]
+        ordering = ["created_at"]
+
+
+class SymptomReport(models.Model):
+    assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE, related_name="symptom_reports")
+    symptom = models.CharField(max_length=40)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("assessment", "symptom"), name="one_report_per_symptom")]
 
 
 class ConversationTurn(models.Model):

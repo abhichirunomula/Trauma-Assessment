@@ -119,6 +119,17 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "dashboard"
+LOGOUT_REDIRECT_URL = "home"
+# Enable these in deployment where HTTPS is terminated.  They keep credentials
+# and sensitive session identifiers out of browser-accessible JavaScript.
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "0") == "1"
+CSRF_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "0") == "1"
+SECURE_SSL_REDIRECT = os.getenv("DJANGO_FORCE_HTTPS", "0") == "1"
+
 # Keep this secret out of source control; configure it in the deployment environment.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")

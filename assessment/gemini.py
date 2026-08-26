@@ -7,6 +7,25 @@ from django.conf import settings
 SYSTEM_INSTRUCTION = """You are a supportive wellbeing check-in companion. Ask one gentle, optional follow-up question. You may describe only reported patterns or possible contributing factors based on the user's own statements. Never diagnose, name a disorder, determine root causes, provide medical advice, or claim certainty. Do not assess imminent safety; the application handles safety separately. Use concise, plain language and include no more than two reported patterns."""
 
 
+def build_context(assessment, history, user_message):
+    """Minimize data sent to Gemini: no identity, ids, timestamps, or full history."""
+    return {
+        "assessment": {
+            "focus": assessment.focus,
+            "experience": assessment.experience_category,
+            "symptoms": assessment.symptoms,
+            "daily_impact": assessment.daily_impact,
+            "support_available": assessment.support_system,
+            "curated_follow_up_answers": [
+                {"question": answer.question_text, "answer": answer.answer}
+                for answer in assessment.answers.filter(question_key__startswith="adaptive_")
+            ],
+        },
+        "recent_conversation": [{"role": item["role"], "content": item["content"]} for item in history[-4:]],
+        "new_message": user_message,
+    }
+
+
 def reflective_reply(assessment, history, user_message):
     """Return validated structured output or a safe local fallback when Gemini is unavailable."""
     api_key = getattr(settings, "GEMINI_API_KEY", "")
@@ -17,7 +36,7 @@ def reflective_reply(assessment, history, user_message):
         from google.genai import types
 
         client = genai.Client(api_key=api_key)
-        context = {"assessment": {"focus": assessment.focus, "experience": assessment.experience_category, "symptoms": assessment.symptoms, "impact": assessment.daily_impact, "support": assessment.support_system}, "history": history[-6:], "new_message": user_message}
+        context = build_context(assessment, history, user_message)
         response = client.models.generate_content(
             model=getattr(settings, "GEMINI_MODEL", "gemini-2.5-flash"),
             contents=json.dumps(context),
