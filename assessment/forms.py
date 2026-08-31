@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth import get_user_model
 
-from .models import Assessment
+from .models import Assessment, CareAssignment, DoctorProfile
 
 
 SYMPTOMS = (("sleep", "Sleep changes"), ("anxiety", "Feeling anxious or on edge"), ("low_mood", "Low mood or loss of interest"), ("concentration", "Difficulty concentrating"), ("pain", "Pain, tension, or physical discomfort"), ("energy", "Low energy or fatigue"), ("appetite", "Changes in appetite"), ("none", "None of these"))
@@ -40,6 +40,18 @@ class RegisterForm(UserCreationForm):
 
 class SignInForm(AuthenticationForm):
     username = forms.CharField(widget=forms.TextInput(attrs={"autocomplete": "username"}))
+
+
+class CareAssignmentForm(forms.ModelForm):
+    class Meta:
+        model = CareAssignment
+        fields = ("patient", "doctor")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        doctor_ids = DoctorProfile.objects.values_list("user_id", flat=True)
+        self.fields["patient"].queryset = get_user_model().objects.exclude(pk__in=doctor_ids).filter(is_staff=False).order_by("username")
+        self.fields["doctor"].queryset = DoctorProfile.objects.select_related("user").order_by("display_name", "user__username")
 
 
 class AdaptiveAnswerForm(forms.Form):

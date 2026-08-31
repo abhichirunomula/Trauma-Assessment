@@ -1,14 +1,16 @@
 from django.contrib.auth import login, logout
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import AdaptiveAnswerForm, ChoiceAnswerForm, ConversationForm, RegisterForm, SYMPTOMS, SignInForm, SymptomsForm
+from .forms import AdaptiveAnswerForm, CareAssignmentForm, ChoiceAnswerForm, ConversationForm, RegisterForm, SYMPTOMS, SignInForm, SymptomsForm
 from .gemini import reflective_reply
-from .models import Assessment, AssessmentAnswer, ConversationTurn, SymptomReport
+from .models import Assessment, AssessmentAnswer, CareAssignment, ConversationTurn, SymptomReport
 
 STEPS = {"focus": ("What would you like to explore?", Assessment.FOCUS_CHOICES, "focus"), "experience": ("Which experience best fits what you are dealing with?", Assessment.EXPERIENCE_CHOICES, "experience_category"), "safety": ("How safe do you feel right now?", Assessment.SAFETY_CHOICES, "safety_status"), "impact": ("How much is this affecting your day-to-day life?", Assessment.IMPACT_CHOICES, "daily_impact"), "support": ("Do you have someone you can contact for support today?", Assessment.SUPPORT_CHOICES, "support_system")}
 NEXT_STEP = {"focus": "experience", "experience": "safety", "safety": "symptoms", "impact": "support", "support": "summary"}
@@ -49,14 +51,28 @@ def register(request):
     return render(request, "registration/register.html", {"form": form})
 
 
-def sign_in(request):
+def _portal_for(user):
+    if user.is_staff:
+        return "admin"
+    if getattr(user, "doctor_profile", None):
+        return "doctor"
+    return "patient"
+
+
+def sign_in(request, portal=None):
     if request.user.is_authenticated:
         return redirect("dashboard")
     form = SignInForm(request, data=request.POST or None)
     if request.method == "POST" and form.is_valid():
-        login(request, form.get_user())
-        return redirect(request.POST.get("next") or "dashboard")
-    return render(request, "registration/login.html", {"form": form})
+        user = form.get_user()
+        actual_portal = _portal_for(user)
+        if portal and actual_portal != portal:
+            form.add_error(None, f"This account belongs to the {actual_portal} portal. Please use the correct sign-in page.")
+        else:
+            login(request, user)
+            return redirect(request.POST.get("next") or "dashboard")
+    labels = {"patient": "Patient", "doctor": "Doctor", "admin": "Administrator"}
+    return render(request, "registration/login.html", {"form": form, "portal": portal, "portal_label": labels.get(portal, "")})
 
 
 @require_POST
@@ -67,8 +83,46 @@ def sign_out(request):
 
 @login_required
 def dashboard(request):
+    if request.user.is_staff:
+        return redirect("admin_dashboard")
+    if getattr(request.user, "doctor_profile", None):
+        return redirect("doctor_dashboard")
     assessments = request.user.assessments.all().prefetch_related("symptom_reports")
     return render(request, "assessment/dashboard.html", {"assessments": assessments, "latest": assessments.first()})
+
+
+@login_required
+def doctor_dashboard(request):
+    doctor = getattr(request.user, "doctor_profile", None)
+    if not doctor:
+        raise PermissionDenied("This area is for assigned doctors only.")
+    assignments = CareAssignment.objects.filter(doctor=doctor).select_related("patient").prefetch_related("patient__assessments")
+    return render(request, "assessment/doctor_dashboard.html", {"assignments": assignments, "doctor": doctor})
+
+
+@login_required
+def doctor_patient_detail(request, patient_id):
+    doctor = getattr(request.user, "doctor_profile", None)
+    if not doctor:
+        raise PermissionDenied("This area is for assigned doctors only.")
+    assignment = get_object_or_404(CareAssignment.objects.select_related("patient"), doctor=doctor, patient_id=patient_id)
+    assessments = Assessment.objects.filter(user=assignment.patient).prefetch_related("answers", "conversation_turns", "symptom_reports")
+    return render(request, "assessment/doctor_patient_detail.html", {"patient": assignment.patient, "assessments": assessments})
+
+
+@staff_member_required
+def admin_dashboard(request):
+    form = CareAssignmentForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        assignment, created = CareAssignment.objects.get_or_create(
+            patient=form.cleaned_data["patient"], doctor=form.cleaned_data["doctor"]
+        )
+        if not created:
+            form.add_error(None, "That patient is already assigned to this doctor.")
+        else:
+            return redirect("admin_dashboard")
+    assignments = CareAssignment.objects.select_related("patient", "doctor__user")
+    return render(request, "assessment/admin_dashboard.html", {"form": form, "assignments": assignments})
 
 
 def _draft(request):

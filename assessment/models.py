@@ -61,3 +61,26 @@ class ConversationTurn(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class DoctorProfile(models.Model):
+    """Marks an account as a clinician who can review assigned patients only."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="doctor_profile")
+    display_name = models.CharField(max_length=150, blank=True)
+
+    def __str__(self):
+        return self.display_name or self.user.get_username()
+
+
+class CareAssignment(models.Model):
+    """An administrator-controlled link between one patient and one doctor."""
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="care_assignments")
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name="patient_assignments")
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("patient", "doctor"), name="one_doctor_assignment_per_patient")]
+        ordering = ["patient__username"]
+
+    def __str__(self):
+        return f"{self.patient.get_username()} → {self.doctor}"

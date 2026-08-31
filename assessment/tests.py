@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from .models import Assessment, ConversationTurn
+from .models import Assessment, CareAssignment, ConversationTurn, DoctorProfile
 
 
 class AssessmentEngineTests(TestCase):
@@ -66,3 +66,50 @@ class AssessmentEngineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(ConversationTurn.objects.filter(assessment=assessment).count(), 2)
         self.assertEqual(response.json()["reply"]["provider"], "gemini")
+
+
+class DoctorReviewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.patient = User.objects.create_user(username="patient-one", password="safe-password-123")
+        self.doctor_user = User.objects.create_user(username="doctor-one", password="safe-password-123")
+        self.other_doctor_user = User.objects.create_user(username="doctor-two", password="safe-password-123")
+        self.doctor = DoctorProfile.objects.create(user=self.doctor_user, display_name="Dr One")
+        self.other_doctor = DoctorProfile.objects.create(user=self.other_doctor_user, display_name="Dr Two")
+        self.assessment = Assessment.objects.create(user=self.patient, focus="mental", safety_status="safe", status=Assessment.Status.COMPLETED)
+
+    def test_assigned_doctor_can_review_patient_responses(self):
+        CareAssignment.objects.create(patient=self.patient, doctor=self.doctor)
+        self.client.force_login(self.doctor_user)
+        response = self.client.get(reverse("doctor_patient_detail", args=[self.patient.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "patient-one")
+
+    def test_unassigned_doctor_cannot_review_patient(self):
+        CareAssignment.objects.create(patient=self.patient, doctor=self.doctor)
+        self.client.force_login(self.other_doctor_user)
+        response = self.client.get(reverse("doctor_patient_detail", args=[self.patient.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_patient_cannot_open_doctor_dashboard(self):
+        self.client.force_login(self.patient)
+        response = self.client.get(reverse("doctor_dashboard"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_patient_is_redirected_to_patient_dashboard(self):
+        self.client.force_login(self.patient)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your private check-in space")
+
+    def test_admin_can_open_assignment_dashboard(self):
+        admin = get_user_model().objects.create_user(username="admin-one", password="safe-password-123", is_staff=True)
+        self.client.force_login(admin)
+        response = self.client.get(reverse("admin_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Patient care assignments")
+
+    def test_role_specific_login_rejects_wrong_portal(self):
+        response = self.client.post(reverse("doctor_login"), {"username": "patient-one", "password": "safe-password-123"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "belongs to the patient portal")
