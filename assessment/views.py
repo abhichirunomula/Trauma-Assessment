@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import AdaptiveAnswerForm, CareAssignmentForm, ChoiceAnswerForm, ConversationForm, RegisterForm, SYMPTOMS, SignInForm, SymptomsForm
 from .gemini import reflective_reply
+from .llm import personalized_summary
 from .models import Assessment, AssessmentAnswer, CareAssignment, ConversationTurn, SymptomReport
 
 STEPS = {"focus": ("What would you like to explore?", Assessment.FOCUS_CHOICES, "focus"), "experience": ("Which experience best fits what you are dealing with?", Assessment.EXPERIENCE_CHOICES, "experience_category"), "safety": ("How safe do you feel right now?", Assessment.SAFETY_CHOICES, "safety_status"), "impact": ("How much is this affecting your day-to-day life?", Assessment.IMPACT_CHOICES, "daily_impact"), "support": ("Do you have someone you can contact for support today?", Assessment.SUPPORT_CHOICES, "support_system")}
@@ -198,13 +199,16 @@ def summary(request):
     assessment = _draft(request)
     if not assessment or any(not getattr(assessment, field) for field in REQUIRED):
         return redirect("focus")
+    if not assessment.ai_summary:
+        assessment.ai_summary = personalized_summary(assessment)
+        assessment.save(update_fields=["ai_summary"])
     if request.method == "POST":
         assessment.status, assessment.completed_at = Assessment.Status.COMPLETED, timezone.now()
         assessment.full_clean()
         assessment.save(update_fields=["status", "completed_at"])
         request.session.pop("assessment_id", None)
-        return render(request, "assessment/complete.html", {"assessment": assessment, "urgent": assessment.safety_status == "unsafe"})
-    return render(request, "assessment/summary.html", {"assessment": assessment, "symptom_labels": [dict(SYMPTOMS)[item] for item in assessment.symptoms], "urgent": assessment.safety_status == "unsafe"})
+        return render(request, "assessment/complete.html", {"assessment": assessment, "ai_summary": assessment.ai_summary, "urgent": assessment.safety_status == "unsafe"})
+    return render(request, "assessment/summary.html", {"assessment": assessment, "ai_summary": assessment.ai_summary, "symptom_labels": [dict(SYMPTOMS)[item] for item in assessment.symptoms], "urgent": assessment.safety_status == "unsafe"})
 
 
 @login_required

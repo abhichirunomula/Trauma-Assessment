@@ -130,9 +130,14 @@ SESSION_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "0") == "1"
 CSRF_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "0") == "1"
 SECURE_SSL_REDIRECT = os.getenv("DJANGO_FORCE_HTTPS", "0") == "1"
 
-# Keep this secret out of source control; configure it in the deployment environment.
+# Keep these secrets out of source control; configure them in the deployment environment.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# Provider for the personalized check-in summary: "openai" | "gemini" | "local".
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
 
 
 # Email

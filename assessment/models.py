@@ -23,6 +23,7 @@ class Assessment(models.Model):
     daily_impact = models.CharField(max_length=20, choices=IMPACT_CHOICES, blank=True)
     support_system = models.CharField(max_length=10, choices=SUPPORT_CHOICES, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IN_PROGRESS)
+    ai_summary = models.JSONField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

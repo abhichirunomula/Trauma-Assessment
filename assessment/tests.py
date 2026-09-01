@@ -15,7 +15,7 @@ class AssessmentEngineTests(TestCase):
     def answer(self, route, key, value):
         return self.client.post(reverse(route), {key: value}, follow=True)
 
-    def complete(self, safety="safe"):
+    def fill_assessment(self, safety="safe"):
         self.answer("focus", "value", "both")
         self.answer("experience", "value", "ongoing_stress")
         self.answer("safety", "value", safety)
@@ -25,6 +25,9 @@ class AssessmentEngineTests(TestCase):
         self.answer("adaptive_question", "value", "routine")
         self.answer("impact", "value", "moderately")
         self.answer("support", "value", "yes")
+
+    def complete(self, safety="safe"):
+        self.fill_assessment(safety=safety)
         return self.client.post(reverse("summary"), follow=True)
 
     def test_every_answer_is_persisted_before_completion(self):
@@ -66,6 +69,27 @@ class AssessmentEngineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(ConversationTurn.objects.filter(assessment=assessment).count(), 2)
         self.assertEqual(response.json()["reply"]["provider"], "gemini")
+
+    @patch("assessment.views.personalized_summary")
+    def test_summary_page_shows_ai_guidance_generated_once(self, summary):
+        summary.return_value = {"situation": "You described ongoing stress affecting your sleep and energy.", "suggestions": ["Keep a consistent wind-down routine before bed.", "Tell one trusted person how your week has been."], "professional_support": "A GP or therapist can help you decide what support fits.", "provider": "openai"}
+        self.fill_assessment()
+        response = self.client.get(reverse("summary"))
+        self.assertContains(response, "You described ongoing stress affecting your sleep and energy.")
+        self.assertContains(response, "Keep a consistent wind-down routine before bed.")
+        self.assertContains(response, "A GP or therapist can help you decide what support fits.")
+        summary.assert_called_once()
+        self.assertEqual(Assessment.objects.get().ai_summary["provider"], "openai")
+
+    def test_summary_uses_safe_local_fallback_when_provider_unavailable(self):
+        with self.settings(LLM_PROVIDER="local"):
+            self.fill_assessment()
+            response = self.client.get(reverse("summary"))
+        self.assertEqual(response.status_code, 200)
+        stored = Assessment.objects.get().ai_summary
+        self.assertEqual(stored["provider"], "local")
+        self.assertGreaterEqual(len(stored["suggestions"]), 3)
+        self.assertContains(response, "SUGGESTIONS FOR YOUR SITUATION")
 
 
 class DoctorReviewTests(TestCase):
