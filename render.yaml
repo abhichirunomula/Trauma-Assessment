@@ -1,0 +1,41 @@
+databases:
+  - name: trauma-assessment-db
+    plan: free
+    databaseName: trauma_assessment
+    user: trauma_assessment
+
+services:
+  - type: web
+    name: trauma-assessment
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn trauma_assessment.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECURE_COOKIES
+        value: "1"
+      - key: DJANGO_FORCE_HTTPS
+        value: "1"
+      - key: DJANGO_HSTS_SECONDS
+        value: "3600"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trauma-assessment-db
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
